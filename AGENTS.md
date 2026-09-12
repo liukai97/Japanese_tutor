@@ -1,0 +1,9 @@
+# Japanese Tutor architecture invariants
+
+- Treat textbook content and its source references as authoritative; do not replace sourced facts with model memory.
+- Keep curriculum data separate from learner data. Curriculum artifacts may be rebuilt, while learner evidence must remain independently portable.
+- Never mutate learner state or derived mastery directly. Learner state changes only through validated, append-only learning evidence; administrative schema initialization is the sole exception.
+- Do not reveal target answers, hidden rubrics, or key forms before the learner's first attempt.
+- Do not implement or persist a reusable question bank. Textbook exercises are source examples, not runtime cards.
+- The program may return context and review candidates, but Codex chooses how to teach and must not receive a program-selected fixed next question.
+- LLM-facing code must use validated application services, CLI commands, or MCP tools rather than direct SQLite access.
