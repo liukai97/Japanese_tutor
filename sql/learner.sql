@@ -1,0 +1,1 @@
+-- Stage 0 placeholder. Learner tables are introduced in stage 5.

@@ -1,0 +1,1 @@
+-- Stage 0 placeholder. Curriculum tables are introduced in stage 4.
