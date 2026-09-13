@@ -1,0 +1,371 @@
+{
+  "sections": [
+    {
+      "id": "liangshuang:L05:lesson_goal:第-5課-初対面-0dfa5af8",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "liangshuang:L05:lesson_goal:学习目标-5147ba16",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "liangshuang:L05:lesson_goal:如何用日语表达-2b2ee973",
+      "pages": [
+        1
+      ]
+    },
+    {
+      "id": "liangshuang:L05:dialogue:会话-a6328025",
+      "pages": [
+        2
+      ]
+    },
+    {
+      "id": "liangshuang:L05:vocabulary:会话用单词-d081b119",
+      "pages": [
+        3
+      ]
+    },
+    {
+      "id": "liangshuang:L05:vocabulary:语法解释用单词-3069674b",
+      "pages": [
+        4
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:语法解释-d0cc5e25",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:1-N1-はN2-です-名词谓语句-889b1989",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:2-N1-はN2-ではありません-名词谓语句的否定形式-07129d1c",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:3-句子か-疑问-b0ff10a8",
+      "pages": [
+        5,
+        6
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:4-N1-で-N2-です-名词的中顿-a7b90445",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:5-N1-のN2-所属-4eba5f23",
+      "pages": [
+        7
+      ]
+    },
+    {
+      "id": "liangshuang:L05:grammar:6-句子ね-确认-语气助词ね-I-7d666af3",
+      "pages": [
+        7
+      ]
+    },
+    {
+      "id": "liangshuang:L05:pragmatics:表达扩展-654a6b5e",
+      "pages": [
+        7
+      ]
+    },
+    {
+      "id": "liangshuang:L05:pragmatics:1-日语中的主语-b501606a",
+      "pages": [
+        7,
+        8
+      ]
+    },
+    {
+      "id": "liangshuang:L05:pragmatics:2-本课出现的在初次见面时常用的表达方式-26d3ecee",
+      "pages": [
+        8,
+        9,
+        10
+      ]
+    },
+    {
+      "id": "liangshuang:L05:vocabulary:习题用单词-da00b627",
+      "pages": [
+        11
+      ]
+    },
+    {
+      "id": "liangshuang:L05:listening_exercise:听力训练-a2fc5208",
+      "pages": [
+        12
+      ]
+    },
+    {
+      "id": "liangshuang:L05:controlled_exercise:基础训练-02c44584",
+      "pages": [
+        13
+      ]
+    },
+    {
+      "id": "liangshuang:L05:speaking_exercise:口语训练-8b592527",
+      "pages": [
+        14,
+        15
+      ]
+    }
+  ],
+  "document_cases": [
+    {
+      "section_id": "liangshuang:L05:dialogue:会话-a6328025",
+      "page": 2,
+      "text": "由加：（看到中村手中写有自己名字的牌子，便走上前去）あのう、李由加です。",
+      "ruby": [
+        {
+          "base": "由",
+          "reading": "ゆ"
+        },
+        {
+          "base": "加",
+          "reading": "か"
+        },
+        {
+          "base": "李",
+          "reading": "り"
+        },
+        {
+          "base": "由",
+          "reading": "ゆ"
+        },
+        {
+          "base": "加",
+          "reading": "か"
+        }
+      ]
+    },
+    {
+      "section_id": "liangshuang:L05:listening_exercise:听力训练-a2fc5208",
+      "page": 12,
+      "text": "1. 听录音，根据录音中的内容判断对错。对的画（○），错的画（×）。\n例：（○）李さんは中国人です。",
+      "ruby": [
+        {
+          "base": "例",
+          "reading": "れい"
+        },
+        {
+          "base": "李",
+          "reading": "り"
+        },
+        {
+          "base": "中",
+          "reading": "ちゅう"
+        },
+        {
+          "base": "国",
+          "reading": "ごく"
+        },
+        {
+          "base": "人",
+          "reading": "じん"
+        }
+      ]
+    }
+  ],
+  "lexical_cases": [
+    {
+      "id": "liangshuang:L05:lexical:李由加-り-ゆか-d5f54571",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 3,
+          "section_id": "liangshuang:L05:vocabulary:会话用单词-d081b119"
+        }
+      ],
+      "fields": {
+        "data.notation.reading": "り ゆか",
+        "data.notation.pitch_accent.raw_notation": "①＋①",
+        "data.notation.pitch_accent.accent_numbers": [
+          1,
+          1
+        ],
+        "data.notation.pitch_accent.interpretation": "component_accents"
+      }
+    },
+    {
+      "id": "liangshuang:L05:lexical:法学部-ほうがくぶ-5d720f0a",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 11,
+          "section_id": "liangshuang:L05:vocabulary:习题用单词-da00b627"
+        }
+      ],
+      "fields": {
+        "data.notation.reading": "ほうがくぶ",
+        "data.notation.pitch_accent.raw_notation": "④③",
+        "data.notation.pitch_accent.accent_numbers": [
+          4,
+          3
+        ],
+        "data.notation.pitch_accent.interpretation": "alternatives"
+      }
+    },
+    {
+      "id": "liangshuang:L05:lexical:お母さん-かあ-cbd8a5d0",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 11,
+          "section_id": "liangshuang:L05:vocabulary:习题用单词-da00b627"
+        }
+      ],
+      "fields": {
+        "data.notation.reading": "かあ",
+        "data.notation.reading_scope": "partial",
+        "data.notation.reading_range": [
+          1,
+          2
+        ]
+      }
+    }
+  ],
+  "semantic_cases": [
+    {
+      "id": "liangshuang:L05:lexical:アメリカ人-じん-03058aa8",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 3,
+          "section_id": "liangshuang:L05:vocabulary:会话用单词-d081b119"
+        }
+      ],
+      "fields": {
+        "data.jlpt": "N4",
+        "data.notation.reading": "じん",
+        "data.notation.reading_range": [
+          4,
+          5
+        ],
+        "data.notation.loanword_original": "America"
+      }
+    },
+    {
+      "id": "liangshuang:L05:lexical:アメリカ-815ccf7a",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 3,
+          "section_id": "liangshuang:L05:vocabulary:会话用单词-d081b119"
+        }
+      ],
+      "fields": {
+        "data.jlpt": "N4",
+        "data.notation.loanword_original": "America"
+      }
+    },
+    {
+      "id": "liangshuang:L05:lexical:人-じん-3bafad1e",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 3,
+          "section_id": "liangshuang:L05:vocabulary:会话用单词-d081b119"
+        }
+      ],
+      "fields": {
+        "data.jlpt": "N4"
+      }
+    },
+    {
+      "id": "liangshuang:L05:grammar:nominal-predicate-negative-66d46290",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 5,
+          "section_id": "liangshuang:L05:grammar:2-N1-はN2-ではありません-名词谓语句的否定形式-07129d1c"
+        }
+      ],
+      "fields": {
+        "category": "grammar",
+        "subtype": "topic",
+        "data.kind": "topic",
+        "data.forms": [
+          "N1 は N2 ではありません。",
+          "N1 は N2 じゃありません。"
+        ],
+        "data.tables": [
+          {
+            "columns": [
+              "时态",
+              "肯定",
+              "否定"
+            ],
+            "rows": [
+              [
+                "现在、将来",
+                "学生です。",
+                "学生ではありません。"
+              ],
+              [
+                "过去",
+                "学生でした。",
+                "学生ではありませんでした。"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "liangshuang:L05:pragmatics:subjects-and-address-5d087919",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 7,
+          "section_id": "liangshuang:L05:pragmatics:1-日语中的主语-b501606a"
+        }
+      ],
+      "fields": {
+        "category": "pragmatics",
+        "subtype": "topic",
+        "data.kind": "topic",
+        "data.forms": [
+          "姓名＋さん",
+          "あの方",
+          "先生",
+          "社長"
+        ]
+      }
+    },
+    {
+      "id": "liangshuang:L05:exercise:speaking-identity-8a5d3a74",
+      "sources": [
+        {
+          "document_id": "liangshuang-l05",
+          "page": 15,
+          "section_id": "liangshuang:L05:speaking_exercise:口语训练-8b592527"
+        }
+      ],
+      "fields": {
+        "target_concept_ids": [
+          "liangshuang:L05:pragmatics:self-introduction-2e0c01f5",
+          "liangshuang:L05:grammar:question-and-confirmation-ka-8c38e111",
+          "liangshuang:L05:grammar:noun-conjunction-de-6a2f7fb7"
+        ],
+        "task_type": "speaking",
+        "progression": "integrated"
+      }
+    }
+  ]
+}
