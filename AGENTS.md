@@ -7,3 +7,6 @@
 - Do not implement or persist a reusable question bank. Textbook exercises are source examples, not runtime cards.
 - The program may return context and review candidates, but Codex chooses how to teach and must not receive a program-selected fixed next question.
 - LLM-facing code must use validated application services, CLI commands, or MCP tools rather than direct SQLite access.
+- For font mapping or similar layout anomalies, Codex must review the corresponding PDF page evidence first; request human review only if uncertainty remains. Preserve source-bound corrections and their review evidence.
+- Codex drives curriculum extraction and verification through validated Python services; Python must not invoke models or launch agents.
+- Curriculum maintenance skill entrypoints: `.agents/skills/japanese-curriculum-extract/SKILL.md` and `.agents/skills/japanese-curriculum-verify/SKILL.md`; use an independent context for source verification.
