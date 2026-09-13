@@ -12,12 +12,14 @@ from typing import Annotated
 import typer
 from pydantic import ValidationError
 
+from japanese_tutor.curriculum.build_db import build_curriculum_database
 from japanese_tutor.curriculum.extract import (
     accept_extraction,
     load_document,
     prepare_extraction,
     source_view,
 )
+from japanese_tutor.curriculum.repository import CurriculumRepository
 from japanese_tutor.ids import document_id
 from japanese_tutor.importer.manifest import identify_lesson, scan_materials
 from japanese_tutor.importer.pipeline import import_pdf, write_import
@@ -55,6 +57,10 @@ def _apply_sql(database_path: Path, migration_path: Path) -> None:
 
 @app.command("build-db")
 def build_db(
+    inputs: Annotated[
+        Path | None,
+        typer.Argument(exists=True, dir_okay=False, help="Approved curriculum build manifest."),
+    ] = None,
     curriculum_db: Annotated[
         Path,
         typer.Option(help="Path to the rebuildable curriculum database.", dir_okay=False),
@@ -68,17 +74,100 @@ def build_db(
         typer.Option(help="Directory containing curriculum.sql and learner.sql.", file_okay=False),
     ] = DEFAULT_SQL_DIR,
 ) -> None:
-    """Initialize or migrate the separate curriculum and learner databases."""
+    """Compile approved curriculum atomically, or initialize infrastructure without inputs."""
 
     try:
-        _apply_sql(curriculum_db, sql_dir / "curriculum.sql")
+        if curriculum_db.resolve() == learner_db.resolve():
+            raise ValueError("Curriculum and learner database paths must be separate")
+        if inputs is not None:
+            result = build_curriculum_database(inputs, curriculum_db, sql_dir / "curriculum.sql")
+            typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+            return
+        # Existing curriculum files must never be migrated in place; rebuild with inputs.
+        if not curriculum_db.exists():
+            _apply_sql(curriculum_db, sql_dir / "curriculum.sql")
         _apply_sql(learner_db, sql_dir / "learner.sql")
-    except (OSError, sqlite3.Error) as error:
+    except (OSError, ValueError, sqlite3.Error) as error:
         typer.echo(f"Database initialization failed: {error}", err=True)
         raise typer.Exit(code=1) from error
 
     typer.echo(f"Curriculum database ready: {curriculum_db.resolve()}")
     typer.echo(f"Learner database ready: {learner_db.resolve()}")
+
+
+@app.command("search")
+def search_command(
+    query: Annotated[str, typer.Argument()],
+    curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
+    / "curriculum.db",
+    lesson: Annotated[
+        list[str] | None, typer.Option(help="Repeat for explicit lesson IDs.")
+    ] = None,
+    concept_type: Annotated[list[str] | None, typer.Option()] = None,
+    learned_only: Annotated[bool, typer.Option()] = False,
+    allowed_lesson: Annotated[list[str] | None, typer.Option()] = None,
+    page: Annotated[int | None, typer.Option(min=1)] = None,
+    limit: Annotated[int, typer.Option(min=1, max=100)] = 10,
+    offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
+) -> None:
+    """Search literal textbook text and concepts with explicit scope; return JSON."""
+    try:
+        result = CurriculumRepository(curriculum_db).search_textbook(
+            query,
+            learned_only,
+            lesson,
+            concept_type,
+            limit,
+            allowed_lesson_ids=allowed_lesson,
+            source_page=page,
+            offset=offset,
+        )
+    except (OSError, ValueError) as error:
+        typer.echo(f"Search failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command("textbook")
+def textbook_command(
+    operation: Annotated[
+        str, typer.Argument(help="concepts, sources, outline, related, exercises, source")
+    ],
+    identifiers: Annotated[list[str], typer.Argument()],
+    curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
+    / "curriculum.db",
+    relation_type: Annotated[list[str] | None, typer.Option()] = None,
+    task_type: Annotated[list[str] | None, typer.Option()] = None,
+    page: Annotated[int | None, typer.Option(min=1)] = None,
+    limit: Annotated[int, typer.Option(min=1, max=100)] = 20,
+    offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
+) -> None:
+    """Read structured curriculum through validated services; never select activities."""
+    repository = CurriculumRepository(curriculum_db)
+    try:
+        if operation == "concepts":
+            result = repository.get_concepts(identifiers)
+        elif operation == "sources":
+            result = repository.get_concept_sources(identifiers)
+        elif operation == "related":
+            result = repository.get_related_concepts(identifiers, relation_type, limit, offset)
+        elif operation in {"outline", "exercises"} and len(identifiers) == 1:
+            result = (
+                repository.get_lesson_outline(identifiers[0])
+                if operation == "outline"
+                else repository.get_exercise_examples(identifiers[0], task_type, limit, offset)
+            )
+        elif operation == "source" and len(identifiers) == 2:
+            result = repository.get_source(identifiers[0], identifiers[1], page)
+        else:
+            raise ValueError(
+                "Invalid operation or ID count (source takes document + section; "
+                "outline/exercises take one lesson)"
+            )
+    except (OSError, ValueError) as error:
+        typer.echo(f"Textbook read failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 @app.command("manifest")

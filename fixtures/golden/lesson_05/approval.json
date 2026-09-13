@@ -1,0 +1,8 @@
+{
+  "document_sha256": "b4dada521d98c784acb7de5d30a85f49c9aadef7a5f70ffba7c39190cf1c5794",
+  "source_artifact_sha256": "7b59b61c6505feb2919a2082c88f025f32b6ec2d905fd72d2f4eeed5b729bcee",
+  "curriculum_sha256": "0664c8286320407d504f0f08d6f93a48f2a70ae6c13f1289931fc41f2f484db8",
+  "human_approved": true,
+  "approved_on": "2026-09-13",
+  "approval_basis": "用户确认阶段1/2多轮人工复核与LLM修改已完成，并明确批准当前第5课结果；独立来源验证与覆盖检查无阻断项。"
+}

@@ -130,7 +130,10 @@ def build_report(document, curriculum, verification=None):
 def write_report(document, curriculum, verification, output: Path):
     report = build_report(document, curriculum, verification)
     write_json(output / "verification_report.json", report)
-    lines = ["# 教材语义验证报告", "", f"状态：{report['status']}；尚未人工确认。", ""]
+    lines = [
+        "# 教材语义验证报告", "",
+        f"自动验证状态：{report['status']}；人工批准由独立冻结记录保存。", "",
+    ]
     lines += [f"- {key}: {value}" for key, value in report["summary"].items()]
     lines += ["", "## 复核队列", ""]
     for entry in report["review_queue"]:
@@ -148,7 +151,7 @@ def write_report(document, curriculum, verification, output: Path):
             lines.append(f"- p. {source['page']} / {source['section_id']}")
         lines.append("")
     if not report["review_queue"]:
-        lines.append("没有自动验证阻断项；阶段 3 仍须异常复核和分层抽样。")
+        lines.append("没有自动验证阻断项；人工复核中如有修改，应复验受影响内容。")
     output.mkdir(parents=True, exist_ok=True)
     (output / "verification_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     return report
