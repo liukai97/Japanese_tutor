@@ -1,0 +1,8 @@
+{
+  "series": "liangshuang",
+  "version": "liangshuang:curriculum:2026-09-13-v1",
+  "shared_group_jlpt": true,
+  "reviewer": "user",
+  "reviewed_on": "2026-09-13",
+  "reason": "用户复核 verification_report.md 后确认：词汇表中带共同等级标注的词组拆分为单词时，拆分词可共同继承该等级。"
+}

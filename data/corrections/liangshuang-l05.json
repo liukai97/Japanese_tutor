@@ -1,0 +1,93 @@
+{
+  "document_id": "liangshuang-l05",
+  "document_sha256": "b4dada521d98c784acb7de5d30a85f49c9aadef7a5f70ffba7c39190cf1c5794",
+  "reviewer": "Codex source-grounded PDF review, 2026-09-13",
+  "evidence": "Original PDF page 12; see liangshuang-conventions.md",
+  "corrections": [
+    {
+      "page": 12,
+      "expected_text": "!\"#$%&'()%&*+,-./0120+3456'1+34762#例：（○）李さんは中国人です。",
+      "replacement": "1. 听录音，根据录音中的内容判断对错。对的画（○），错的画（×）。\n例：（○）李さんは中国人です。",
+      "ruby": [
+        {
+          "range": [
+            35,
+            36
+          ],
+          "reading": "れい"
+        },
+        {
+          "range": [
+            40,
+            41
+          ],
+          "reading": "り"
+        },
+        {
+          "range": [
+            44,
+            45
+          ],
+          "reading": "ちゅう"
+        },
+        {
+          "range": [
+            45,
+            46
+          ],
+          "reading": "ごく"
+        },
+        {
+          "range": [
+            46,
+            47
+          ],
+          "reading": "じん"
+        }
+      ]
+    },
+    {
+      "page": 12,
+      "expected_text": "8\"#$%&'()%&*+,-'9:;<=>?@A*2#",
+      "replacement": "2. 听录音，根据录音中的内容，将正确答案填在括号中。",
+      "ruby": []
+    },
+    {
+      "page": 12,
+      "expected_text": "!\"#\"#$%",
+      "replacement": null,
+      "ruby": []
+    },
+    {
+      "page": 12,
+      "expected_text": "#BCDEFG*4G*HI6J*K4*KHI6DEL+MNOPHI2##",
+      "replacement": "背景介绍：田中（田中さん）向中村（中村さん）介绍他的朋友キムさん。",
+      "ruby": [
+        {
+          "range": [
+            8,
+            10
+          ],
+          "reading": "たなか"
+        },
+        {
+          "range": [
+            17,
+            19
+          ],
+          "reading": "なかむら"
+        }
+      ]
+    }
+  ],
+  "resolutions": [
+    {
+      "page": 12,
+      "category": "font_mapping"
+    },
+    {
+      "page": 12,
+      "category": "unsupported_layout"
+    }
+  ]
+}
