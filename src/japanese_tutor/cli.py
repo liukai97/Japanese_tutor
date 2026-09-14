@@ -23,7 +23,9 @@ from japanese_tutor.curriculum.repository import CurriculumRepository
 from japanese_tutor.ids import document_id
 from japanese_tutor.importer.manifest import identify_lesson, scan_materials
 from japanese_tutor.importer.pipeline import import_pdf, write_import
+from japanese_tutor.learner.repository import LearnerRepository, initialize_learner_database
 from japanese_tutor.schemas.curriculum import SemanticCurriculum
+from japanese_tutor.schemas.learner import EvidenceBatch, FrontierUpdate, LearnerProfile
 from japanese_tutor.schemas.source import LessonDocument
 from japanese_tutor.verification.codex import accept_verification, prepare_verification
 from japanese_tutor.verification.report import write_report
@@ -86,7 +88,7 @@ def build_db(
         # Existing curriculum files must never be migrated in place; rebuild with inputs.
         if not curriculum_db.exists():
             _apply_sql(curriculum_db, sql_dir / "curriculum.sql")
-        _apply_sql(learner_db, sql_dir / "learner.sql")
+        initialize_learner_database(learner_db, sql_dir / "learner.sql")
     except (OSError, ValueError, sqlite3.Error) as error:
         typer.echo(f"Database initialization failed: {error}", err=True)
         raise typer.Exit(code=1) from error
@@ -106,12 +108,15 @@ def search_command(
     concept_type: Annotated[list[str] | None, typer.Option()] = None,
     learned_only: Annotated[bool, typer.Option()] = False,
     allowed_lesson: Annotated[list[str] | None, typer.Option()] = None,
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
     page: Annotated[int | None, typer.Option(min=1)] = None,
     limit: Annotated[int, typer.Option(min=1, max=100)] = 10,
     offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
 ) -> None:
     """Search literal textbook text and concepts with explicit scope; return JSON."""
     try:
+        if learned_only and allowed_lesson is None:
+            allowed_lesson = LearnerRepository(learner_db).get_learned_lesson_ids()
         result = CurriculumRepository(curriculum_db).search_textbook(
             query,
             learned_only,
@@ -124,6 +129,111 @@ def search_command(
         )
     except (OSError, ValueError) as error:
         typer.echo(f"Search failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command("init-learner")
+def init_learner_command(
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
+) -> None:
+    """Initialize learner schema independently; never infer learned lessons or mastery."""
+    try:
+        result = initialize_learner_database(learner_db)
+    except (OSError, ValueError, sqlite3.Error) as error:
+        typer.echo(f"Learner initialization failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command("record-evidence")
+def record_evidence_command(
+    inputs: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
+    curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
+    / "curriculum.db",
+) -> None:
+    """Append a validated observation batch or correction; return an idempotent receipt."""
+    try:
+        batch = EvidenceBatch.model_validate_json(inputs.read_text(encoding="utf-8"))
+        result = LearnerRepository(learner_db, curriculum_db).record_evidence(batch)
+    except (OSError, ValueError) as error:
+        typer.echo(f"Evidence write failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command("rebuild-state")
+def rebuild_state_command(
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
+) -> None:
+    """Recompute descriptive state from learner evidence, without curriculum access."""
+    try:
+        result = LearnerRepository(learner_db).rebuild_state()
+    except (OSError, ValueError) as error:
+        typer.echo(f"State rebuild failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@app.command("learner-context")
+def learner_context_command(
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
+    max_chars: Annotated[int, typer.Option(min=1000, max=64000)] = 12000,
+) -> None:
+    """Return bounded learner context; the complete curriculum boundary is preserved."""
+    try:
+        result = LearnerRepository(learner_db).get_learner_context(max_chars)
+    except (OSError, ValueError) as error:
+        typer.echo(f"Learner context failed: {error}", err=True)
+        raise typer.Exit(code=1) from error
+    typer.echo(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+
+
+@app.command("learner")
+def learner_command(
+    operation: Annotated[
+        str,
+        typer.Argument(
+            help="profile, set-profile, frontier, record-frontier, history, evidence, state, review"
+        ),
+    ],
+    inputs: Annotated[Path | None, typer.Option(exists=True, dir_okay=False)] = None,
+    learner_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR / "learner.db",
+    curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
+    / "curriculum.db",
+    concept: Annotated[str | None, typer.Option()] = None,
+    limit: Annotated[int, typer.Option(min=1, max=100)] = 20,
+    offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
+) -> None:
+    """Read learner data or submit explicit profile/frontier configuration as JSON."""
+    try:
+        repository = LearnerRepository(learner_db, curriculum_db)
+        if operation == "profile":
+            result = repository.get_profile()
+        elif operation == "frontier":
+            result = repository.get_frontier()
+        elif operation in {"set-profile", "record-frontier"}:
+            if inputs is None:
+                raise ValueError("This operation requires --inputs JSON")
+            content = inputs.read_text(encoding="utf-8")
+            result = (
+                repository.set_profile(LearnerProfile.model_validate_json(content))
+                if operation == "set-profile"
+                else repository.record_frontier(FrontierUpdate.model_validate_json(content))
+            )
+        elif operation == "history":
+            result = repository.get_recent_history(limit, offset)
+        elif operation == "evidence":
+            result = repository.get_learning_evidence(concept, limit, offset)
+        elif operation == "state":
+            result = repository.get_concept_state([concept] if concept else None, limit, offset)
+        elif operation == "review":
+            result = repository.get_review_candidates(limit)
+        else:
+            raise ValueError("Unknown learner operation")
+    except (OSError, ValueError) as error:
+        typer.echo(f"Learner operation failed: {error}", err=True)
         raise typer.Exit(code=1) from error
     typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
 

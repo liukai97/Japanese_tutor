@@ -2,7 +2,8 @@
 
 - Treat textbook content and its source references as authoritative; do not replace sourced facts with model memory.
 - Keep curriculum data separate from learner data. Curriculum artifacts may be rebuilt, while learner evidence must remain independently portable.
-- Never mutate learner state or derived mastery directly. Learner state changes only through validated, append-only learning evidence; administrative schema initialization is the sole exception.
+- Codex must never write derived ability state directly. Validated services append learning evidence (including corrections/retractions) and recompute replaceable state; no mastery-edit tool is exposed.
+- Profile preferences may be updated through validated configuration services. Course scope/focus changes use explicit append-only frontier records; learned lessons and allowed extensions are separate and never inferred from scores.
 - Do not reveal target answers, hidden rubrics, or key forms before the learner's first attempt.
 - Do not implement or persist a reusable question bank. Textbook exercises are source examples, not runtime cards.
 - The program may return context and review candidates, but Codex chooses how to teach and must not receive a program-selected fixed next question.
