@@ -126,3 +126,20 @@ class EvidenceBatch(Contract):
         if len({item.id for item in self.evidence}) != len(self.evidence):
             raise ValueError("Evidence IDs must be unique")
         return self
+
+
+class EvidenceBatchSet(Contract):
+    """Up to three independent activity writes committed in one transaction."""
+
+    batches: list[EvidenceBatch] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def unique_ids(self) -> Self:
+        if len({batch.idempotency_key for batch in self.batches}) != len(self.batches):
+            raise ValueError("Batch idempotency keys must be unique")
+        if len({batch.interaction.id for batch in self.batches}) != len(self.batches):
+            raise ValueError("Batch interaction IDs must be unique")
+        evidence_ids = [item.id for batch in self.batches for item in batch.evidence]
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("Evidence IDs must be unique across the batch set")
+        return self

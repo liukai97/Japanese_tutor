@@ -11,3 +11,4 @@
 - For font mapping or similar layout anomalies, Codex must review the corresponding PDF page evidence first; request human review only if uncertainty remains. Preserve source-bound corrections and their review evidence.
 - Codex drives curriculum extraction and verification through validated Python services; Python must not invoke models or launch agents.
 - Curriculum maintenance skill entrypoints: `.agents/skills/japanese-curriculum-extract/SKILL.md` and `.agents/skills/japanese-curriculum-verify/SKILL.md`; use an independent context for source verification.
+- Learner teaching and assessment entrypoint: `.agents/skills/japanese-tutor/SKILL.md`.

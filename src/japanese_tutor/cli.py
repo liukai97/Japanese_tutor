@@ -6,6 +6,7 @@ activity selection belong to Codex, not to this module.
 
 import json
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -25,7 +26,12 @@ from japanese_tutor.importer.manifest import identify_lesson, scan_materials
 from japanese_tutor.importer.pipeline import import_pdf, write_import
 from japanese_tutor.learner.repository import LearnerRepository, initialize_learner_database
 from japanese_tutor.schemas.curriculum import SemanticCurriculum
-from japanese_tutor.schemas.learner import EvidenceBatch, FrontierUpdate, LearnerProfile
+from japanese_tutor.schemas.learner import (
+    EvidenceBatch,
+    EvidenceBatchSet,
+    FrontierUpdate,
+    LearnerProfile,
+)
 from japanese_tutor.schemas.source import LessonDocument
 from japanese_tutor.verification.codex import accept_verification, prepare_verification
 from japanese_tutor.verification.report import write_report
@@ -153,10 +159,15 @@ def record_evidence_command(
     curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
     / "curriculum.db",
 ) -> None:
-    """Append a validated observation batch or correction; return an idempotent receipt."""
+    """Append one batch or an atomic set of up to three; return state changes."""
     try:
-        batch = EvidenceBatch.model_validate_json(inputs.read_text(encoding="utf-8"))
-        result = LearnerRepository(learner_db, curriculum_db).record_evidence(batch)
+        content = inputs.read_text(encoding="utf-8")
+        raw = json.loads(content)
+        repository = LearnerRepository(learner_db, curriculum_db)
+        if isinstance(raw, dict) and "batches" in raw:
+            result = repository.record_evidence_set(EvidenceBatchSet.model_validate_json(content))
+        else:
+            result = repository.record_evidence(EvidenceBatch.model_validate_json(content))
     except (OSError, ValueError) as error:
         typer.echo(f"Evidence write failed: {error}", err=True)
         raise typer.Exit(code=1) from error
@@ -414,6 +425,12 @@ def verify_command(
 def main() -> None:
     """Run the maintenance CLI."""
 
+    # Codex consumes JSON through pipes. Windows otherwise defaults to a legacy code
+    # page, which corrupts Japanese and Chinese source text at that boundary.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
     app()
 
 
