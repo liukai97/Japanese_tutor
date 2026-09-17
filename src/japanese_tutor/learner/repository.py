@@ -9,7 +9,12 @@ from pathlib import Path
 
 from japanese_tutor.curriculum.repository import CurriculumRepository
 from japanese_tutor.learner.projection import PROJECTION_VERSION, project
-from japanese_tutor.schemas.learner import EvidenceBatch, FrontierUpdate, LearnerProfile
+from japanese_tutor.schemas.learner import (
+    EvidenceBatch,
+    EvidenceBatchSet,
+    FrontierUpdate,
+    LearnerProfile,
+)
 
 DATABASE_VERSION = "1"
 SQL_PATH = Path(__file__).resolve().parents[3] / "sql" / "learner.sql"
@@ -78,6 +83,9 @@ class LearnerRepository:
             connection.execute("PRAGMA foreign_keys=ON")
             if write:
                 connection.execute("BEGIN IMMEDIATE")
+                # Evidence rows are projected before their immutable receipt is stored.
+                # Deferral keeps the whole set atomic while satisfying the batch FK at commit.
+                connection.execute("PRAGMA defer_foreign_keys=ON")
             else:
                 connection.execute("PRAGMA query_only=ON")
                 connection.execute("BEGIN")
@@ -201,117 +209,235 @@ class LearnerRepository:
             states = self._rebuild(connection)
         return {"state_count": len(states), "projection_version": PROJECTION_VERSION}
 
-    def record_evidence(self, batch: EvidenceBatch) -> dict:
-        batch = EvidenceBatch.model_validate_json(batch.model_dump_json())
-        payload_hash = hashlib.sha256(_json(batch.model_dump(mode="json")).encode()).hexdigest()
+    @staticmethod
+    def _state_delta(states: list[dict], batches: list[EvidenceBatch]) -> list[dict]:
+        """Return post-write state only for concept dimensions touched by the write."""
+
+        affected = sorted(
+            {
+                (item.concept_id, item.dimension)
+                for batch in batches
+                for item in batch.evidence
+            }
+        )
+        indexed = {(item["concept_id"], item["dimension"]): item for item in states}
+        return [
+            {
+                "concept_id": concept_id,
+                "dimension": dimension,
+                "state": indexed.get((concept_id, dimension)),
+            }
+            for concept_id, dimension in affected
+        ]
+
+    @staticmethod
+    def _merge_state_deltas(receipts: list[dict]) -> list[dict]:
+        indexed = {
+            (item["concept_id"], item["dimension"]): item
+            for receipt in receipts
+            for item in receipt["state_delta"]
+        }
+        return [indexed[key] for key in sorted(indexed)]
+
+    def _append_batch(
+        self,
+        connection,
+        batch: EvidenceBatch,
+        *,
+        allowed_lesson_ids: list[str],
+        concepts: dict[str, dict],
+    ) -> dict:
+        """Append one prevalidated batch inside the caller's transaction."""
+
         interaction = batch.interaction
         interaction_payload = _json(interaction.model_dump(mode="json"))
-        with self._connect(write=True) as connection:
-            receipt = connection.execute(
-                "SELECT payload_sha256,response_json FROM evidence_batches WHERE id=?",
-                (batch.idempotency_key,),
-            ).fetchone()
-            if receipt:
-                if receipt[0] != payload_hash:
-                    raise ValueError("Evidence idempotency conflict: same key, different payload")
-                return json.loads(receipt[1])
-            if interaction.observed_at > _now() + timedelta(minutes=5):
-                raise ValueError("Observation time cannot be in the future")
-            existing = connection.execute(
-                "SELECT payload_json FROM interactions WHERE id=?", (interaction.id,)
-            ).fetchone()
-            if existing and existing[0] != interaction_payload:
-                raise ValueError("Interaction ID already has different content")
-            if not existing:
-                if interaction.retry_of:
-                    original = connection.execute(
-                        "SELECT payload_json FROM interactions WHERE id=?", (interaction.retry_of,)
-                    ).fetchone()
-                    if original is None:
-                        raise ValueError("Unknown retry interaction")
-                    original = json.loads(original[0])
-                    if (
-                        original["activity_id"] != interaction.activity_id
-                        or original["session_id"] != interaction.session_id
-                        or datetime.fromisoformat(original["observed_at"]) > interaction.observed_at
-                    ):
-                        raise ValueError("Retry must share activity/session and follow original")
-                elif connection.execute(
-                    "SELECT 1 FROM interactions WHERE activity_id=?", (interaction.activity_id,)
-                ).fetchone():
-                    raise ValueError("Repeated activity must identify retry_of")
-                connection.execute(
-                    "INSERT INTO interactions VALUES (?,?,?,?,?,?)",
-                    (
-                        interaction.id,
-                        interaction.activity_id,
-                        interaction.session_id,
-                        interaction.observed_at.isoformat(),
-                        interaction.task_type,
-                        interaction_payload,
-                    ),
-                )
-            response = {
-                "interaction_id": interaction.id,
-                "evidence_ids": [item.id for item in batch.evidence],
-                "projection_version": PROJECTION_VERSION,
-            }
+        if interaction.observed_at > _now() + timedelta(minutes=5):
+            raise ValueError("Observation time cannot be in the future")
+        existing = connection.execute(
+            "SELECT payload_json FROM interactions WHERE id=?", (interaction.id,)
+        ).fetchone()
+        if existing and existing[0] != interaction_payload:
+            raise ValueError("Interaction ID already has different content")
+        if not existing:
+            if interaction.retry_of:
+                original = connection.execute(
+                    "SELECT payload_json FROM interactions WHERE id=?", (interaction.retry_of,)
+                ).fetchone()
+                if original is None:
+                    raise ValueError("Unknown retry interaction")
+                original = json.loads(original[0])
+                if (
+                    original["activity_id"] != interaction.activity_id
+                    or original["session_id"] != interaction.session_id
+                    or datetime.fromisoformat(original["observed_at"]) > interaction.observed_at
+                ):
+                    raise ValueError("Retry must share activity/session and follow original")
+            elif connection.execute(
+                "SELECT 1 FROM interactions WHERE activity_id=?", (interaction.activity_id,)
+            ).fetchone():
+                raise ValueError("Repeated activity must identify retry_of")
             connection.execute(
-                "INSERT INTO evidence_batches VALUES (?,?,?,?)",
-                (batch.idempotency_key, payload_hash, _now().isoformat(), _json(response)),
+                "INSERT INTO interactions VALUES (?,?,?,?,?,?)",
+                (
+                    interaction.id,
+                    interaction.activity_id,
+                    interaction.session_id,
+                    interaction.observed_at.isoformat(),
+                    interaction.task_type,
+                    interaction_payload,
+                ),
             )
-            allowed = self._frontier(connection)["allowed_lesson_ids"]
+        for item in batch.evidence:
+            if item.supersedes:
+                original = connection.execute(
+                    "SELECT * FROM learning_evidence WHERE id=?", (item.supersedes,)
+                ).fetchone()
+                if original is None:
+                    raise ValueError("Unknown superseded evidence")
+                if connection.execute(
+                    "SELECT 1 FROM learning_evidence WHERE supersedes=?", (item.supersedes,)
+                ).fetchone():
+                    raise ValueError("Correction must supersede the latest evidence")
+                if (
+                    original["interaction_id"] != interaction.id
+                    or original["concept_id"] != item.concept_id
+                    or original["dimension"] != item.dimension
+                ):
+                    raise ValueError("Correction must preserve interaction/concept/dimension")
+                lesson_id = original["lesson_id"]
+            else:
+                concept = concepts[item.concept_id]
+                lesson_id = concept["lesson_id"]
+                if lesson_id not in allowed_lesson_ids:
+                    raise ValueError(f"Concept is outside allowed lessons: {item.concept_id}")
+                if item.dimension == "natural_usage" and concept["category"] == "phonology":
+                    raise ValueError("Phonology cannot be assessed as natural_usage")
+            connection.execute(
+                "INSERT INTO learning_evidence "
+                "(id,batch_id,interaction_id,concept_id,lesson_id,dimension,kind,supersedes,"
+                "payload_json) VALUES (?,?,?,?,?,?,?,?,?)",
+                (
+                    item.id,
+                    batch.idempotency_key,
+                    interaction.id,
+                    item.concept_id,
+                    lesson_id,
+                    item.dimension,
+                    item.kind,
+                    item.supersedes,
+                    _json(item.model_dump(mode="json")),
+                ),
+            )
+        return {
+            "interaction_id": interaction.id,
+            "evidence_ids": [item.id for item in batch.evidence],
+            "projection_version": PROJECTION_VERSION,
+        }
+
+    def record_evidence_set(self, batch_set: EvidenceBatchSet) -> dict:
+        """Commit one to three activity batches atomically and rebuild state once."""
+
+        batch_set = EvidenceBatchSet.model_validate_json(batch_set.model_dump_json())
+        payload_hashes = {
+            batch.idempotency_key: hashlib.sha256(
+                _json(batch.model_dump(mode="json")).encode()
+            ).hexdigest()
+            for batch in batch_set.batches
+        }
+        with self._connect(write=True) as connection:
+            stored: dict[str, dict] = {}
+            pending: list[EvidenceBatch] = []
+            for batch in batch_set.batches:
+                receipt = connection.execute(
+                    "SELECT payload_sha256,response_json FROM evidence_batches WHERE id=?",
+                    (batch.idempotency_key,),
+                ).fetchone()
+                if receipt:
+                    if receipt[0] != payload_hashes[batch.idempotency_key]:
+                        raise ValueError(
+                            "Evidence idempotency conflict: same key, different payload"
+                        )
+                    stored[batch.idempotency_key] = json.loads(receipt[1])
+                else:
+                    pending.append(batch)
+
+            if stored and pending:
+                raise ValueError("Evidence batch set cannot mix recorded and new batches")
+
+            if not pending:
+                states = self._states(connection)
+                receipts = []
+                for batch in batch_set.batches:
+                    receipt = stored[batch.idempotency_key]
+                    if "state_delta" not in receipt:  # Backward compatibility for old receipts.
+                        receipt = {
+                            **receipt,
+                            "state_delta": self._state_delta(states, [batch]),
+                        }
+                    receipts.append(receipt)
+                return {
+                    "batch_receipts": receipts,
+                    "projection_version": PROJECTION_VERSION,
+                    "state_delta": self._merge_state_deltas(receipts),
+                }
+
             new_ids = list(
-                dict.fromkeys(item.concept_id for item in batch.evidence if item.supersedes is None)
+                dict.fromkeys(
+                    item.concept_id
+                    for batch in pending
+                    for item in batch.evidence
+                    if item.supersedes is None
+                )
             )
             concepts = (
                 {item["id"]: item for item in self._curriculum().get_concepts(new_ids)}
                 if new_ids
                 else {}
             )
-            for item in batch.evidence:
-                if item.supersedes:
-                    original = connection.execute(
-                        "SELECT * FROM learning_evidence WHERE id=?", (item.supersedes,)
-                    ).fetchone()
-                    if original is None:
-                        raise ValueError("Unknown superseded evidence")
-                    if connection.execute(
-                        "SELECT 1 FROM learning_evidence WHERE supersedes=?", (item.supersedes,)
-                    ).fetchone():
-                        raise ValueError("Correction must supersede the latest evidence")
-                    if (
-                        original["interaction_id"] != interaction.id
-                        or original["concept_id"] != item.concept_id
-                        or original["dimension"] != item.dimension
-                    ):
-                        raise ValueError("Correction must preserve interaction/concept/dimension")
-                    lesson_id = original["lesson_id"]
-                else:
-                    concept = concepts[item.concept_id]
-                    lesson_id = concept["lesson_id"]
-                    if lesson_id not in allowed:
-                        raise ValueError(f"Concept is outside allowed lessons: {item.concept_id}")
-                    if item.dimension == "natural_usage" and concept["category"] == "phonology":
-                        raise ValueError("Phonology cannot be assessed as natural_usage")
+            allowed = self._frontier(connection)["allowed_lesson_ids"]
+            base_receipts = [
+                self._append_batch(
+                    connection,
+                    batch,
+                    allowed_lesson_ids=allowed,
+                    concepts=concepts,
+                )
+                for batch in pending
+            ]
+            states = (
+                self._rebuild(connection)
+                if any(batch.evidence for batch in pending)
+                else self._states(connection)
+            )
+            receipts = []
+            recorded_at = _now().isoformat()
+            for batch, base_receipt in zip(pending, base_receipts, strict=True):
+                receipt = {
+                    **base_receipt,
+                    "state_delta": self._state_delta(states, [batch]),
+                }
                 connection.execute(
-                    "INSERT INTO learning_evidence "
-                    "(id,batch_id,interaction_id,concept_id,lesson_id,dimension,kind,supersedes,"
-                    "payload_json) VALUES (?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO evidence_batches VALUES (?,?,?,?)",
                     (
-                        item.id,
                         batch.idempotency_key,
-                        interaction.id,
-                        item.concept_id,
-                        lesson_id,
-                        item.dimension,
-                        item.kind,
-                        item.supersedes,
-                        _json(item.model_dump(mode="json")),
+                        payload_hashes[batch.idempotency_key],
+                        recorded_at,
+                        _json(receipt),
                     ),
                 )
-            self._rebuild(connection)
-        return response
+                receipts.append(receipt)
+            return {
+                "batch_receipts": receipts,
+                "projection_version": PROJECTION_VERSION,
+                "state_delta": self._state_delta(states, pending),
+            }
+
+    def record_evidence(self, batch: EvidenceBatch) -> dict:
+        """Commit one activity batch while preserving the original single-write API."""
+
+        batch = EvidenceBatch.model_validate_json(batch.model_dump_json())
+        result = self.record_evidence_set(EvidenceBatchSet(batches=[batch]))
+        return result["batch_receipts"][0]
 
     @staticmethod
     def _states(connection) -> list[dict]:

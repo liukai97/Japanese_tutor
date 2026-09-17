@@ -11,7 +11,12 @@ from typer.testing import CliRunner
 
 from japanese_tutor.cli import app
 from japanese_tutor.learner.repository import LearnerRepository, initialize_learner_database
-from japanese_tutor.schemas.learner import EvidenceBatch, FrontierUpdate, LearnerProfile
+from japanese_tutor.schemas.learner import (
+    EvidenceBatch,
+    EvidenceBatchSet,
+    FrontierUpdate,
+    LearnerProfile,
+)
 
 
 @pytest.fixture
@@ -170,6 +175,62 @@ def test_projection_failure_rolls_back_evidence_and_receipt(learner, monkeypatch
     assert repository.get_concept_state() == previous_state
 
 
+def test_three_activity_set_is_atomic_rebuilds_once_and_returns_state_delta(
+    learner, monkeypatch
+):
+    repository, concepts, _, _ = learner
+    request = EvidenceBatchSet(
+        batches=[batch(concepts[0], number) for number in (1, 2, 3)]
+    )
+    rebuild = repository._rebuild
+    rebuild_calls = 0
+
+    def counted(connection):
+        nonlocal rebuild_calls
+        rebuild_calls += 1
+        return rebuild(connection)
+
+    monkeypatch.setattr(repository, "_rebuild", counted)
+    receipt = repository.record_evidence_set(request)
+    assert rebuild_calls == 1
+    assert counts(repository) == {
+        "interactions": 3,
+        "learning_evidence": 3,
+        "evidence_batches": 3,
+        "concept_state": 1,
+    }
+    assert len(receipt["batch_receipts"]) == 3
+    assert receipt["state_delta"][0]["state"]["status"] == "consistent_recently"
+    assert repository.record_evidence_set(request) == receipt
+    assert rebuild_calls == 1
+    repository.record_evidence(batch(concepts[0], 4, "partial"))
+    reopened = LearnerRepository(repository.database)
+    assert reopened.record_evidence_set(request) == receipt
+    assert rebuild_calls == 2
+
+
+def test_invalid_activity_rolls_back_the_whole_activity_set(learner):
+    repository, concepts, outside, _ = learner
+    request = EvidenceBatchSet(
+        batches=[batch(concepts[0], 1), batch(outside, 2)]
+    )
+    before = counts(repository)
+    with pytest.raises(ValueError, match="outside allowed"):
+        repository.record_evidence_set(request)
+    assert counts(repository) == before
+
+
+def test_activity_set_rejects_partial_idempotent_replay(learner):
+    repository, concepts, _, _ = learner
+    repository.record_evidence(batch(concepts[0], 1))
+    request = EvidenceBatchSet(
+        batches=[batch(concepts[0], 1), batch(concepts[0], 2)]
+    )
+    with pytest.raises(ValueError, match="mix recorded and new"):
+        repository.record_evidence_set(request)
+    assert counts(repository)["interactions"] == 1
+
+
 @pytest.mark.parametrize(
     "changes",
     [
@@ -265,7 +326,14 @@ def test_correction_retraction_and_recovery_without_curriculum(learner):
     with pytest.raises(ValueError, match="latest"):
         portable.record_evidence(correction(original, "branch", "evidence-1"))
     withdrawn = correction(original, "withdrawn", "fixed", kind="retraction", result=None)
-    portable.record_evidence(withdrawn)
+    withdrawn_receipt = portable.record_evidence(withdrawn)
+    assert withdrawn_receipt["state_delta"] == [
+        {
+            "concept_id": concepts[0],
+            "dimension": "controlled_production",
+            "state": None,
+        }
+    ]
     assert portable.get_concept_state() == []
     restored = correction(original, "restored", "withdrawn", result="partial")
     portable.record_evidence(restored)
@@ -444,3 +512,27 @@ def test_cli_end_to_end_and_frontier_search(learner, tmp_path):
         item["lesson_id"] in repository.get_learned_lesson_ids()
         for item in json.loads(result.stdout)
     )
+
+
+def test_cli_accepts_atomic_evidence_batch_set(learner, tmp_path):
+    repository, concepts, _, _ = learner
+    request = EvidenceBatchSet(
+        batches=[batch(concepts[0], number) for number in (1, 2, 3)]
+    )
+    path = tmp_path / "evidence-set.json"
+    path.write_text(request.model_dump_json(), encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        [
+            "record-evidence",
+            str(path),
+            "--learner-db",
+            str(repository.database),
+            "--curriculum-db",
+            str(repository.curriculum.database),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    receipt = json.loads(result.stdout)
+    assert len(receipt["batch_receipts"]) == 3
+    assert receipt["state_delta"][0]["state"]["effective_observation_count"] == 3
