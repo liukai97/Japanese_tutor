@@ -63,4 +63,6 @@ Save a local result JSON. Submit with
 `jt verify <document> <semantic_curriculum.json> --submission <result.json>`.
 The CLI validates hashes, scope and required checks, then reports all missing checks,
 conflicts, unresolved values and proposed claims. Partial checks stay pending.
-Automatic verification does not grant human approval or freeze regression goldens.
+Automatic verification does not grant human approval. Routine lessons do not need
+regression goldens; create one only when the user explicitly requests a maintained
+regression fixture.

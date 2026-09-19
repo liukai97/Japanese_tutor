@@ -9,7 +9,9 @@ Codex drives this workflow. Python prepares source/candidates, validates submiss
 and saves artifacts; it never calls models. Run commands from the project root.
 
 1. Run `jt extract <lesson_document.json>` (or `python -m japanese_tutor.cli extract`).
-   Read `semantic/source.json`, `candidate_curriculum.json`, and `extraction_schema.json`.
+   Read `extraction_schema.json`, the prepared section index and deterministic
+   candidates once. Use `jt show-source <lesson_document.json> --section <id>` for
+   focused evidence instead of repeatedly loading the full Document or source bundle.
    Read `data/corrections/<series>-conventions.md` when available. Imported document
    metadata identifies the notation convention. `source.json` also includes the
    series' validated `data/corrections/<series>-curriculum.json` convention snapshot;
@@ -75,4 +77,8 @@ and saves artifacts; it never calls models. Run commands from the project root.
 If font mapping/layout evidence is unreliable, inspect the corresponding rendered
 PDF page first. Preserve source-bound corrections and review evidence; escalate
 only remaining uncertainty. Keep generated textbook artifacts local. Stage 3
-human review and golden approval are separate from automatic verification.
+requires explicit human approval after automatic verification. Do not create a
+per-lesson regression golden unless the user explicitly requests regression coverage;
+golden fixtures are not a release gate. For approval, manifest updates, database
+builds and the token-efficient run shape, read [references/release.md](references/release.md)
+only when the lesson is being prepared for release.
