@@ -11,6 +11,7 @@ from japanese_tutor.schemas.source import (
     LessonDocument,
     RubyAnnotation,
     SourceRef,
+    Table,
     TextBlock,
 )
 
@@ -28,7 +29,9 @@ class TextCorrection(Contract):
 
 class ReviewResolution(Contract):
     page: int = Field(ge=1)
-    category: Literal["font_mapping", "unsupported_layout"]
+    category: Literal[
+        "font_mapping", "unbound_ruby", "unsupported_layout", "unrecovered_tables"
+    ]
 
 
 class CorrectionOverlay(Contract):
@@ -79,6 +82,18 @@ def apply_corrections(
                 text=correction.replacement, ruby=correction.ruby, sources=[source]
             )
             updates[section_id][index] = TextBlock(role="paragraph", content=content)
+    for resolution in overlay.resolutions:
+        if resolution.category != "unrecovered_tables":
+            continue
+        for section_id, blocks in updates.items():
+            for index, block in enumerate(blocks):
+                if not isinstance(block, Table) or not any(
+                    source.page == resolution.page for source in block.sources
+                ):
+                    continue
+                if any(cell is None for row in block.rows for cell in row):
+                    raise ValueError("Reviewed table still has missing cells")
+                updates[section_id][index] = block.model_copy(update={"status": "reconstructed"})
     result = document.model_copy(
         update={
             "sections": [
@@ -99,9 +114,16 @@ def apply_corrections(
         if not matches:
             raise ValueError("Correction resolution does not match a pending issue")
         if any(
-            isinstance(b, TextBlock)
-            and b.content.status == "unresolved"
-            and any(ref.page == resolution.page for ref in b.content.sources)
+            (
+                isinstance(b, TextBlock)
+                and b.content.status == "unresolved"
+                and any(ref.page == resolution.page for ref in b.content.sources)
+            )
+            or (
+                isinstance(b, Table)
+                and b.status == "unresolved"
+                and any(ref.page == resolution.page for ref in b.sources)
+            )
             for s in result.sections
             for b in s.blocks
         ):

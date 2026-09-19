@@ -36,11 +36,31 @@ def lexical_notations(text: str, *, series: str = "liangshuang") -> list[Lexical
     # A cell may have indented component words and a wrapped accent marker.
     lines = text.splitlines()
     joined = []
-    for line in lines:
-        if PITCH_PATTERN.fullmatch(line.strip()) and joined:
-            joined[-1] += line.strip()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        abbreviation = PITCH_PATTERN.search(stripped)
+        if (
+            stripped.startswith("〔")
+            and abbreviation
+            and abbreviation.end() == len(stripped)
+            and index + 1 < len(lines)
+        ):
+            explanation = re.fullmatch(r"[（(]([^）)]+)[）)]の略〕", lines[index + 1].strip())
+            if explanation:
+                surface = stripped[1 : abbreviation.start()].strip()
+                joined.append(f"{surface}（{explanation[1]}）{abbreviation[0]}")
+                index += 2
+                continue
+        wrapped_reading = re.fullmatch(
+            r"[（(][^）)]+[）)](?:" + PITCH_PATTERN.pattern + r")?", stripped
+        )
+        if joined and (PITCH_PATTERN.fullmatch(stripped) or wrapped_reading):
+            joined[-1] += stripped
         else:
             joined.append(line)
+        index += 1
     for line in joined:
         match = PITCH_PATTERN.search(line)
         raw_word = line[: match.start()].strip() if match else line.strip()

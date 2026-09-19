@@ -175,6 +175,16 @@ def test_japanese_notation_preserves_observations() -> None:
     word = lexical_notations("東京大学（とうきょうだいがく）\n⑤")[0]
     assert word.surface == "東京大学" and word.reading == "とうきょうだいがく"
     assert word.pitch_accent.raw_notation == "⑤"
+    wrapped = lexical_notations("お疲れ様でした\n（おつかれさまでした）⑦")[0]
+    assert wrapped.surface == "お疲れ様でした" and wrapped.reading == "おつかれさまでした"
+    assert wrapped.pitch_accent.raw_notation == "⑦"
+    abbreviation = lexical_notations(
+        "アパート②\n〔アパートメントハウス⑧\n（apartment house）の略〕"
+    )
+    assert [item.surface for item in abbreviation] == ["アパート", "アパートメントハウス"]
+    assert abbreviation[1].loanword_original == "apartment house"
+    assert abbreviation[1].pitch_accent.raw_notation == "⑧"
+    assert all(item.reading_status != "unresolved" for item in abbreviation)
     partial = lexical_notations("お母（かあ）さん②")[0]
     assert partial.surface == "お母さん" and partial.reading_scope == "partial"
     assert partial.reading_status == "observed" and partial.reading_range == (1, 2)
