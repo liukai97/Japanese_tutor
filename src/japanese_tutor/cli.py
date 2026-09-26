@@ -206,7 +206,10 @@ def learner_command(
     operation: Annotated[
         str,
         typer.Argument(
-            help="profile, set-profile, frontier, record-frontier, history, evidence, state, review"
+            help=(
+                "profile, set-profile, frontier, record-frontier, history, evidence, state, "
+                "vocabulary, review"
+            )
         ),
     ],
     inputs: Annotated[Path | None, typer.Option(exists=True, dir_okay=False)] = None,
@@ -214,6 +217,7 @@ def learner_command(
     curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
     / "curriculum.db",
     concept: Annotated[str | None, typer.Option()] = None,
+    lesson: Annotated[list[str] | None, typer.Option()] = None,
     limit: Annotated[int, typer.Option(min=1, max=100)] = 20,
     offset: Annotated[int, typer.Option(min=0, max=10000)] = 0,
 ) -> None:
@@ -239,6 +243,8 @@ def learner_command(
             result = repository.get_learning_evidence(concept, limit, offset)
         elif operation == "state":
             result = repository.get_concept_state([concept] if concept else None, limit, offset)
+        elif operation == "vocabulary":
+            result = repository.get_vocabulary_state(lesson, limit, offset)
         elif operation == "review":
             result = repository.get_review_candidates(limit)
         else:
@@ -252,7 +258,8 @@ def learner_command(
 @app.command("textbook")
 def textbook_command(
     operation: Annotated[
-        str, typer.Argument(help="concepts, sources, outline, related, exercises, source")
+        str,
+        typer.Argument(help="concepts, vocabulary, sources, outline, related, exercises, source"),
     ],
     identifiers: Annotated[list[str], typer.Argument()],
     curriculum_db: Annotated[Path, typer.Option(dir_okay=False)] = DEFAULT_DATA_DIR
@@ -268,6 +275,10 @@ def textbook_command(
     try:
         if operation == "concepts":
             result = repository.get_concepts(identifiers)
+        elif operation == "vocabulary":
+            result = repository.get_lesson_concepts(
+                identifiers, category="lexical", limit=limit, offset=offset
+            )
         elif operation == "sources":
             result = repository.get_concept_sources(identifiers)
         elif operation == "related":

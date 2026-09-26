@@ -1,7 +1,7 @@
 """Recover ruled tables and horizontal reading units without flattening PDF text."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pymupdf
 
@@ -50,7 +50,7 @@ def recover_layout(
     for table in tables:
         bbox = tuple(table.bbox)
         spans = [s for s in layout.spans if inside(s, bbox)]
-        if table.col_count < 2 or table.row_count < 2 or not spans:
+        if table.col_count < 2 or not spans:
             continue
         cells = [[tuple(cell) if cell else None for cell in row.cells] for row in table.rows]
         table_type = "unknown"
@@ -60,6 +60,8 @@ def recover_layout(
             {s.text.strip() for s in spans}
         ):
             table_type = "conjugation"
+        if table.row_count < 2 and table_type != "vocabulary":
+            continue
         if table_type == "unknown" or any(cell is None for row in cells for cell in row):
             report.add(
                 "unrecovered_tables",
@@ -166,8 +168,27 @@ def reconstruct_table(
             if bbox is None:
                 contents.append(None)
                 continue
-            spans = [s for s in unit.spans if inside(s, bbox)]
-            assigned.update(s.order for s in spans)
+            spans = []
+            for span in unit.spans:
+                chars = tuple(c for c in span.characters if inside(c, bbox))
+                if not chars:
+                    continue
+                spans.append(
+                    replace(
+                        span,
+                        text="".join(c.text for c in chars),
+                        characters=chars,
+                        bbox=(
+                            min(c.bbox[0] for c in chars),
+                            min(c.bbox[1] for c in chars),
+                            max(c.bbox[2] for c in chars),
+                            max(c.bbox[3] for c in chars),
+                        ),
+                    )
+                )
+                assigned.update(
+                    (span.order, i) for i, c in enumerate(span.characters) if inside(c, bbox)
+                )
             content = reconstruct_text(spans, source, report)
             if unit.table_type == "vocabulary" and column == 1 and content.text:
                 notations = lexical_notations(content.text, series=series)
@@ -192,7 +213,12 @@ def reconstruct_table(
                         )
             contents.append(content)
         rows.append(contents)
-    missing = [s.text for s in unit.spans if s.order not in assigned]
+    missing = [
+        c.text
+        for s in unit.spans
+        for i, c in enumerate(s.characters)
+        if (s.order, i) not in assigned and not c.text.isspace()
+    ]
     unresolved = unit.table_type == "unknown" or any(c is None for row in rows for c in row)
     if missing:
         unresolved = True

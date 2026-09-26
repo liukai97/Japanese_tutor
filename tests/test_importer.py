@@ -190,6 +190,9 @@ def test_japanese_notation_preserves_observations() -> None:
     assert partial.reading_status == "observed" and partial.reading_range == (1, 2)
     loan = lexical_notations("アメリカ（America）⓪")[0]
     assert loan.loanword_original == "America" and loan.reading is None
+    french = lexical_notations("メートル（【法】mètre）⓪")[0]
+    assert french.loanword_original == "【法】mètre" and french.reading is None
+    assert french.reading_status == "unknown"
     mixed = lexical_notations("アメリカ人（America じん）④")[0]
     assert (mixed.loanword_original, mixed.reading, mixed.reading_range) == (
         "America",
@@ -198,6 +201,11 @@ def test_japanese_notation_preserves_observations() -> None:
     )
     suffix = lexical_notations("イタリア語（-ご）⓪")[0]
     assert suffix.reading == "ご" and suffix.reading_range == (4, 5)
+    minus_suffix = lexical_notations("アジア人（−じん）③")[0]
+    assert minus_suffix.reading == "じん"
+    assert minus_suffix.reading_scope == "partial"
+    assert minus_suffix.reading_range == (3, 4)
+    assert minus_suffix.reading_status == "observed"
     assert lexical_notations("私（watashi）⓪")[0].reading_status == "unresolved"
     assert parse_pitch("④③", is_phrase=True).status == "unresolved"
     assert lexical_notations("こんにちは【今日は】⑤")[0].orthographic_variants == ["今日は"]

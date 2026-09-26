@@ -29,6 +29,10 @@ validated curriculum and learner services and never selects the next activity.
      co-practice relations;
    - `textbook exercises <lesson-id>` for source examples of training goals and
      progression. Treat them as examples, never runtime cards;
+   - `textbook vocabulary <lesson-id> [<lesson-id> ...]` for the source-grounded
+     lexical concepts available for dynamic vocabulary practice;
+   - `learner vocabulary [--lesson <lesson-id>]` for vocabulary entries joined to
+     their observed, dimension-specific learner state, including unobserved words;
    - `search <literal-query> --learned-only` for review material inside the explicit
      learned scope. Use an explicit lesson filter when introducing current new content.
 
@@ -68,6 +72,30 @@ Before the first attempt, do not display or imply a key form that would answer t
 task. Choice options may contain the necessary candidate forms, but never identify the
 correct one. Any concept outside the ordinary scope must be an explicit extension
 target with a learner-visible notice; never make unlearned content a silent prerequisite.
+
+### Vocabulary activities
+
+Generate vocabulary activities dynamically from retrieved lexical concepts; never
+persist or reuse a fixed question bank. Target one or a small number of real lexical
+concept IDs and record the most specific observable vocabulary dimension:
+
+- `meaning_recognition`: choose or match a meaning for a shown Japanese form;
+- `meaning_recall`: supply the meaning of a shown Japanese form;
+- `reading_recognition`: choose or match a sourced reading;
+- `reading_recall`: supply the sourced reading of a shown form;
+- `form_recognition`: choose the Japanese form from a meaning or reading;
+- `form_recall`: supply the Japanese form from a meaning or reading;
+- `controlled_usage`: use the word in a constrained sentence or dialogue;
+- `natural_usage`: use the word appropriately in open communication.
+
+Use `recognition` or `recall` only for non-lexical targets when a more specific lexical
+dimension applies. Ask reading questions only when the lexical concept contains a
+resolved reading; do not fabricate readings for kana-only words, loanword originals,
+or unresolved partial readings. Ground meanings, forms, readings, and distractors in
+retrieved concepts inside the active scope. A text response cannot establish listening,
+pronunciation, or pitch. Usage questions may rely only on already learned grammar or an
+explicitly disclosed extension, and must not invent collocational restrictions that the
+source does not support.
 
 Present the set naturally without protocol IDs, schema fields, internal reasoning, or
 the rubrics. Stop and wait for the learner's response. Do not write the learner's side
@@ -109,11 +137,11 @@ Use the existing evidence meanings exactly:
 - `confidence: insufficient`: the answer does not support a stable judgment. Prefer a
   targeted clarification or later re-observation over a forced result.
 
-Record recognition, recall, controlled production, free production, and natural usage
-separately. A constrained task does not prove free production. Text does not prove
-speech, listening, pronunciation, or pitch. Classify every recorded error with a short,
-stable code and a learner-appropriate explanation; feedback should prioritize one or
-two actionable points.
+Record recognition, recall, controlled production, free production, natural usage, and
+the vocabulary-specific dimensions above separately. A constrained task does not prove
+free production or natural usage. Text does not prove speech, listening, pronunciation,
+or pitch. Classify every recorded error with a short, stable code and a learner-appropriate
+explanation; feedback should prioritize one or two actionable points.
 
 Convert each assessed attempt to an `EvidenceBatch`, then submit one `EvidenceBatchSet`
 with one to three batches. Store each activity's complete learner-visible task context,

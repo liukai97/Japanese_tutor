@@ -8,6 +8,7 @@ from japanese_tutor.schemas.source import (
     Contract,
     JapaneseText,
     LexicalNotation,
+    PitchAccent,
     SourceRef,
 )
 
@@ -48,6 +49,7 @@ class LexicalVariant(Contract):
     meaning: str | None = None
     part_of_speech: str | None = None
     jlpt: str | None = None
+    pitch_accent: PitchAccent | None = Field(default=None, exclude_if=lambda value: value is None)
     sources: list[SourceRef] = Field(min_length=1)
 
 

@@ -141,6 +141,38 @@ def test_multi_concept_restart_idempotency_and_replay(learner):
     assert counts(repository) == before
 
 
+def test_vocabulary_dimensions_are_recorded_and_joined_to_lexical_data(learner):
+    repository, concepts, _, _ = learner
+    initial = repository.get_vocabulary_state()
+    assert len(initial) == 1
+    assert initial[0]["concept_id"] == concepts[0]
+    assert initial[0]["surface"] == "お母さん"
+    assert initial[0]["reading"] == "かあ"
+    assert initial[0]["meaning"] == "妈妈"
+    assert initial[0]["observed"] is False
+    assert initial[0]["abilities"] == []
+
+    raw = batch(concepts[0]).model_dump(mode="json")
+    raw["evidence"][0]["dimension"] = "meaning_recognition"
+    repository.record_evidence(EvidenceBatch.model_validate_json(json.dumps(raw)))
+
+    vocabulary = repository.get_vocabulary_state()
+    assert vocabulary[0]["observed"] is True
+    assert [item["dimension"] for item in vocabulary[0]["abilities"]] == ["meaning_recognition"]
+    assert vocabulary[0]["abilities"][0]["status"] == "insufficient_evidence"
+
+
+def test_vocabulary_dimensions_reject_nonlexical_concepts(learner):
+    repository, concepts, _, _ = learner
+    raw = batch(concepts[1]).model_dump(mode="json")
+    raw["evidence"][0]["dimension"] = "reading_recall"
+    with pytest.raises(ValueError, match="lexical concept"):
+        repository.record_evidence(EvidenceBatch.model_validate_json(json.dumps(raw)))
+    assert repository.get_concept_state() == []
+    with pytest.raises(ValueError, match="lesson_ids"):
+        repository.get_vocabulary_state([""])
+
+
 @pytest.mark.parametrize("invalid", ["unknown", "outside"])
 def test_invalid_concept_rolls_back_entire_batch(learner, invalid):
     repository, concepts, outside, _ = learner
@@ -512,6 +544,20 @@ def test_cli_end_to_end_and_frontier_search(learner, tmp_path):
         item["lesson_id"] in repository.get_learned_lesson_ids()
         for item in json.loads(result.stdout)
     )
+    result = runner.invoke(
+        app,
+        [
+            "learner",
+            "vocabulary",
+            *options,
+            "--curriculum-db",
+            str(repository.curriculum.database),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    vocabulary = json.loads(result.stdout)
+    assert vocabulary[0]["concept_id"] == concepts[0]
+    assert vocabulary[0]["observed"] is True
 
 
 def test_cli_accepts_atomic_evidence_batch_set(learner, tmp_path):

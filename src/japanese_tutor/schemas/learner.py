@@ -8,8 +8,30 @@ from pydantic import AwareDatetime, Field, field_validator, model_validator
 from japanese_tutor.schemas.source import Contract
 
 Identifier = Annotated[str, Field(min_length=1, max_length=200, pattern=r"^\S+$")]
+LEXICAL_DIMENSIONS = frozenset(
+    {
+        "meaning_recognition",
+        "meaning_recall",
+        "reading_recognition",
+        "reading_recall",
+        "form_recognition",
+        "form_recall",
+        "controlled_usage",
+    }
+)
 Dimension = Literal[
-    "recognition", "recall", "controlled_production", "free_production", "natural_usage"
+    "recognition",
+    "recall",
+    "controlled_production",
+    "free_production",
+    "natural_usage",
+    "meaning_recognition",
+    "meaning_recall",
+    "reading_recognition",
+    "reading_recall",
+    "form_recognition",
+    "form_recall",
+    "controlled_usage",
 ]
 Result = Literal["independent", "assisted", "partial", "unsuccessful"]
 
