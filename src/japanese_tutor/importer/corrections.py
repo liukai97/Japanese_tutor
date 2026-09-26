@@ -29,9 +29,18 @@ class TextCorrection(Contract):
 
 class ReviewResolution(Contract):
     page: int = Field(ge=1)
-    category: Literal[
-        "font_mapping", "unbound_ruby", "unsupported_layout", "unrecovered_tables"
-    ]
+    category: Literal["font_mapping", "unbound_ruby", "unsupported_layout", "unrecovered_tables"]
+    expected_table_text: str | None = None
+    intentional_empty_cells: list[tuple[int, int]] = Field(default_factory=list)
+
+
+class TableCellCorrection(Contract):
+    page: int = Field(ge=1)
+    expected_table_text: str = Field(min_length=1)
+    row: int = Field(ge=0)
+    column: int = Field(ge=0)
+    expected_text: str | None
+    replacement: str
 
 
 class CorrectionOverlay(Contract):
@@ -40,6 +49,7 @@ class CorrectionOverlay(Contract):
     reviewer: str = Field(min_length=1)
     evidence: str = Field(min_length=1)
     corrections: list[TextCorrection] = Field(min_length=1)
+    table_cells: list[TableCellCorrection] = Field(default_factory=list)
     resolutions: list[ReviewResolution] = Field(default_factory=list)
 
 
@@ -82,22 +92,71 @@ def apply_corrections(
                 text=correction.replacement, ruby=correction.ruby, sources=[source]
             )
             updates[section_id][index] = TextBlock(role="paragraph", content=content)
+    for correction in overlay.table_cells:
+        matches = [
+            (section_id, index, block)
+            for section_id, blocks in updates.items()
+            for index, block in enumerate(blocks)
+            if isinstance(block, Table)
+            and any(ref.page == correction.page for ref in block.sources)
+            and "|".join(cell.text if cell else "" for row in block.rows for cell in row)
+            == correction.expected_table_text
+        ]
+        if len(matches) != 1:
+            raise ValueError("Table correction requires exactly one matching table")
+        section_id, index, block = matches[0]
+        if correction.row >= len(block.rows) or correction.column >= len(block.columns):
+            raise ValueError("Table correction cell is out of range")
+        cell = block.rows[correction.row][correction.column]
+        if (cell.text if cell else None) != correction.expected_text:
+            raise ValueError("Table correction does not match expected cell")
+        rows = [list(row) for row in block.rows]
+        rows[correction.row][correction.column] = JapaneseText(
+            text=correction.replacement,
+            sources=[
+                SourceRef(
+                    document_id=overlay.document_id, page=correction.page, section_id=section_id
+                )
+            ],
+        )
+        updates[section_id][index] = block.model_copy(update={"rows": rows})
     for resolution in overlay.resolutions:
         if resolution.category != "unrecovered_tables":
             continue
+        matched = 0
         for section_id, blocks in updates.items():
             for index, block in enumerate(blocks):
                 if not isinstance(block, Table) or not any(
                     source.page == resolution.page for source in block.sources
                 ):
                     continue
-                if any(cell is None for row in block.rows for cell in row):
-                    raise ValueError("Reviewed table still has missing cells")
+                table_text = "|".join(
+                    cell.text if cell else "" for row in block.rows for cell in row
+                )
+                if (
+                    resolution.expected_table_text is not None
+                    and table_text != resolution.expected_table_text
+                ):
+                    continue
+                matched += 1
+                missing = {(r, c) for r, row in enumerate(block.rows)
+                           for c, cell in enumerate(row) if cell is None}
+                if missing != set(resolution.intentional_empty_cells):
+                    raise ValueError("Reviewed table missing cells differ from the page evidence")
                 updates[section_id][index] = block.model_copy(update={"status": "reconstructed"})
+        if not matched or (resolution.expected_table_text is not None and matched != 1):
+            raise ValueError("Table review requires a matching table on the page")
+    removed_sections = {
+        s.section_id
+        for s in document.sections
+        if s.section_type == "unknown" and s.blocks and not updates[s.section_id]
+    }
     result = document.model_copy(
         update={
             "sections": [
-                s.model_copy(update={"blocks": updates[s.section_id]}) for s in document.sections
+                s.model_copy(update={"blocks": updates[s.section_id]})
+                for s in document.sections
+                if s.section_id not in removed_sections
             ]
         }
     )
@@ -129,6 +188,17 @@ def apply_corrections(
         ):
             raise ValueError("Cannot resolve a page with remaining unresolved text")
         resolved_issues.extend(matches)
+    for issue in report.issues:
+        if (
+            issue["category"] == "low_confidence_sections"
+            and issue.get("section_id") in removed_sections
+        ):
+            issue.update(
+                severity="info",
+                resolution="source_corrected_empty_section_removed",
+                reviewer=overlay.reviewer,
+                evidence=overlay.evidence,
+            )
     for issue in resolved_issues:
         issue.update(
             severity="info",
@@ -136,11 +206,11 @@ def apply_corrections(
             reviewer=overlay.reviewer,
             evidence=overlay.evidence,
         )
-    for correction in overlay.corrections:
+    for correction in [*overlay.corrections, *overlay.table_cells]:
         report.add(
             "source_correction",
             correction.page,
-            correction.expected_text,
+            correction.expected_text or "",
             severity="info",
             replacement=correction.replacement,
             reviewer=overlay.reviewer,

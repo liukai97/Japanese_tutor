@@ -12,11 +12,17 @@ from .report import QualityReport
 
 def is_ruby_candidate(span: Span) -> bool:
     compact = span.text.strip().replace(" ", "")
-    return span.size <= 7 and bool(compact) and bool(re.fullmatch(r"[ぁ-ゖァ-ヺー]+", compact))
+    return (
+        span.size <= 8
+        and bool(compact)
+        and bool(
+            re.fullmatch(r"[ぁ-ゖァ-ヺー]+(?:[（(][ぁ-ゖァ-ヺー]+[）)][ぁ-ゖァ-ヺー]*)?", compact)
+        )
+    )
 
 
 def base_character(char: Character) -> bool:
-    return bool(re.fullmatch(r"[\u3400-\u9fff々〇0-9０-９]", char.text))
+    return bool(re.fullmatch(r"[\u3400-\u9fff々〇0-9０-９A-Za-zＡ-Ｚａ-ｚ]", char.text))
 
 
 @dataclass

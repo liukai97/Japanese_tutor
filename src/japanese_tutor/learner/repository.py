@@ -10,6 +10,7 @@ from pathlib import Path
 from japanese_tutor.curriculum.repository import CurriculumRepository
 from japanese_tutor.learner.projection import PROJECTION_VERSION, project
 from japanese_tutor.schemas.learner import (
+    LEXICAL_DIMENSIONS,
     EvidenceBatch,
     EvidenceBatchSet,
     FrontierUpdate,
@@ -310,6 +311,10 @@ class LearnerRepository:
                 lesson_id = concept["lesson_id"]
                 if lesson_id not in allowed_lesson_ids:
                     raise ValueError(f"Concept is outside allowed lessons: {item.concept_id}")
+                if item.dimension in LEXICAL_DIMENSIONS and concept["category"] != "lexical":
+                    raise ValueError(
+                        f"Lexical dimension requires a lexical concept: {item.concept_id}"
+                    )
                 if item.dimension == "natural_usage" and concept["category"] == "phonology":
                     raise ValueError("Phonology cannot be assessed as natural_usage")
             connection.execute(
@@ -468,6 +473,51 @@ class LearnerRepository:
             if concept_ids is not None:
                 states = [item for item in states if item["concept_id"] in concept_ids]
             return states[offset : offset + limit]
+
+    def get_vocabulary_state(
+        self, lesson_ids: list[str] | None = None, limit: int = 100, offset: int = 0
+    ) -> list[dict]:
+        """Join lexical curriculum entries with their dimension-specific learner states."""
+
+        _bounds(limit, offset)
+        if lesson_ids is not None and (
+            not isinstance(lesson_ids, list)
+            or len(lesson_ids) > 100
+            or any(not isinstance(value, str) or not value for value in lesson_ids)
+        ):
+            raise ValueError("lesson_ids must contain at most 100 nonempty IDs")
+        curriculum = self._curriculum()
+        with self._connect() as connection:
+            frontier = self._frontier(connection)
+            allowed = frontier["allowed_lesson_ids"]
+            selected = allowed if lesson_ids is None else list(dict.fromkeys(lesson_ids))
+            if any(identifier not in allowed for identifier in selected):
+                raise ValueError("Vocabulary query lessons must be inside the allowed frontier")
+            if not selected:
+                return []
+            states = self._states(connection)
+        indexed: dict[str, list[dict]] = {}
+        for state in states:
+            indexed.setdefault(state["concept_id"], []).append(state)
+        concepts = curriculum.get_lesson_concepts(selected, "lexical", limit, offset)
+        result = []
+        for concept in concepts:
+            data = concept["data"]
+            notation = data["notation"]
+            abilities = sorted(indexed.get(concept["id"], []), key=lambda item: item["dimension"])
+            result.append(
+                {
+                    "concept_id": concept["id"],
+                    "lesson_id": concept["lesson_id"],
+                    "surface": notation["surface"],
+                    "reading": notation["reading"],
+                    "meaning": data["meaning"],
+                    "part_of_speech": data["part_of_speech"],
+                    "observed": bool(abilities),
+                    "abilities": abilities,
+                }
+            )
+        return result
 
     def get_recent_history(self, limit=10, offset=0) -> list[dict]:
         _bounds(limit, offset)

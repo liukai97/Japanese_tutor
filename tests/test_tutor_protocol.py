@@ -181,6 +181,43 @@ def test_interaction_snapshot_is_plain_text_and_preserves_visible_choices_and_no
     assert not result.interaction.prompt.startswith("{")
 
 
+def test_vocabulary_activity_supports_specific_lexical_dimensions():
+    lexical = "liangshuang:L05:lexical:学生-がくせい"
+    source = SourceRef(
+        document_id="liangshuang-l05",
+        page=4,
+        section_id="liangshuang:L05:vocabulary:grammar-words",
+    )
+    item = GeneratedActivity(
+        id="vocabulary-activity-1",
+        session_id="session-1",
+        form="recall",
+        response_mode="short_text",
+        learner_prompt="写出「学生」的读音。",
+        targets=[
+            ActivityTarget(
+                concept_id=lexical,
+                role="primary",
+                dimensions=["reading_recall"],
+            )
+        ],
+        transfer_level="same_context",
+        hidden_rubric=[
+            RubricCriterion(
+                id="vocabulary-criterion-1",
+                concept_id=lexical,
+                dimension="reading_recall",
+                criterion="Judge the sourced reading only.",
+                success_indicators=["The learner supplies がくせい."],
+                common_error_codes=["reading_incorrect"],
+                sources=[source],
+            )
+        ],
+        sources=[source],
+    )
+    assert item.targets[0].dimensions == ["reading_recall"]
+
+
 def test_session_plan_rejects_overlapping_concept_roles():
     raw = plan().model_dump(mode="json")
     raw["review_concept_ids"] = [CONCEPT]

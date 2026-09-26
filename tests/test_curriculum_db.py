@@ -159,6 +159,10 @@ def test_artifact_roundtrip_and_structured_reads(built):
     repository = CurriculumRepository(destination)
     concepts = [o.model_dump(mode="json") for o in curriculum.objects if o.kind == "concept"]
     assert repository.get_concepts([o["id"] for o in concepts]) == concepts
+    assert repository.get_lesson_concepts([curriculum.lesson.id], "lexical") == [concepts[0]]
+    assert (
+        repository.get_lesson_concepts([curriculum.lesson.id], "lexical", limit=1, offset=1) == []
+    )
     assert repository.get_source(
         document.manifest.document_id, document.sections[0].section_id, page=1
     ) == document.sections[0].model_dump(mode="json")
@@ -179,6 +183,8 @@ def test_artifact_roundtrip_and_structured_reads(built):
         repository.get_source(document.manifest.document_id, document.sections[0].section_id, 2)
     with pytest.raises(ValueError, match="relation type"):
         repository.get_related_concepts([concepts[1]["id"]], ["guessed"])
+    with pytest.raises(ValueError, match="category"):
+        repository.get_lesson_concepts([curriculum.lesson.id], "guessed")
 
 
 def test_multilingual_literal_search_scope_and_pagination(built):
@@ -371,3 +377,8 @@ def test_failed_compilation_readonly_and_cli_boundary(built):
         app, ["textbook", "outline", "sample:L05", "--curriculum-db", str(destination)]
     )
     assert result.exit_code == 0, result.output
+    result = runner.invoke(
+        app, ["textbook", "vocabulary", "sample:L05", "--curriculum-db", str(destination)]
+    )
+    assert result.exit_code == 0, result.output
+    assert [item["category"] for item in json.loads(result.stdout)] == ["lexical"]

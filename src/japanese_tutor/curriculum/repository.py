@@ -7,6 +7,7 @@ from pathlib import Path
 
 from japanese_tutor.curriculum.build_db import DATABASE_VERSION, normalize
 from japanese_tutor.schemas.curriculum import (
+    TAXONOMY,
     Concept,
     ConceptRelation,
     Dialogue,
@@ -142,6 +143,43 @@ class CurriculumRepository:
             if any(obj["kind"] != "concept" for obj in result):
                 raise ValueError("Requested ID is not a concept")
             return result
+
+    def get_lesson_concepts(
+        self,
+        lesson_ids: list[str],
+        category: str | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict]:
+        """Return concepts in stable lesson/object order, optionally by category."""
+
+        identifiers = _ids(lesson_ids)
+        _bounds(limit, offset)
+        if category is not None and category not in TAXONOMY:
+            raise ValueError("Unknown concept category")
+        marks = ",".join("?" for _ in identifiers)
+        where = f"o.lesson_id IN ({marks})"
+        params: list[str | int] = list(identifiers)
+        if category is not None:
+            where += " AND c.category=?"
+            params.append(category)
+        with self._connect() as connection:
+            known = {
+                row[0]
+                for row in connection.execute(
+                    f"SELECT id FROM lessons WHERE id IN ({marks})", identifiers
+                )
+            }
+            missing = [identifier for identifier in identifiers if identifier not in known]
+            if missing:
+                raise ValueError(f"Unknown lesson: {missing[0]}")
+            rows = connection.execute(
+                "SELECT c.id FROM concepts c JOIN objects o ON o.id=c.id WHERE "
+                + where
+                + " ORDER BY o.lesson_id,o.rowid LIMIT ? OFFSET ?",
+                [*params, limit, offset],
+            ).fetchall()
+            return [self._object(connection, row[0]) for row in rows]
 
     def get_concept_sources(self, concept_ids: list[str]) -> list[dict]:
         # Supports carry short literal anchors; the original rich source is fetched separately.

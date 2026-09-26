@@ -76,6 +76,13 @@ def lexical_notations(text: str, *, series: str = "liangshuang") -> list[Lexical
         reading_range = None
         original = None
         if reading:
+            # This series also prints kana words with a bracketed kanji spelling
+            # in the reading slot, e.g. すぐ（【直】ぐ） and ところ（【所】）.
+            alternate = re.fullmatch(r"【([\u3400-\u9fff々]+)】([ぁ-ゖァ-ヺー]*)", reading)
+            if series == "liangshuang" and alternate and re.fullmatch(r"[ぁ-ゖァ-ヺー]+", surface):
+                variants.append(alternate[1] + alternate[2])
+                reading = None
+        if reading:
             scope = "partial" if raw_word[reading_match.end() :].strip() else "whole_word"
             status = (
                 "observed"
@@ -83,15 +90,23 @@ def lexical_notations(text: str, *, series: str = "liangshuang") -> list[Lexical
                 else "unresolved"
             )
             if series == "liangshuang":
+                # A repeated Latin prefix is not a kana reading or a loanword original.
+                latin_base = re.fullmatch(r"([A-Za-z]+)\s*([\u3400-\u9fff々]+)", surface)
+                latin_reading = re.fullmatch(r"([A-Za-z]+)\s*([ぁ-ゖァ-ヺー]+)", reading)
+                if latin_base and latin_reading and latin_base[1] == latin_reading[1]:
+                    reading = latin_reading[2]
+                    scope = "partial"
                 if re.search(r"[ァ-ヺー]", surface):
                     foreign = re.fullmatch(
-                        r"([A-Za-z][A-Za-z0-9 .'-]*?)(?:\s+([ぁ-ゖァ-ヺー]+))?", reading
+                        r"((?:【[^】]+】\s*)?[A-Za-zÀ-ÖØ-öø-ÿＡ-Ｚａ-ｚ]"
+                        r"[A-Za-zÀ-ÖØ-öø-ÿＡ-Ｚａ-ｚ0-9０-９ .'-]*?)"
+                        r"(?:\s+([ぁ-ゖァ-ヺー]+))?", reading
                     )
                     if foreign:
                         original, reading = foreign[1], foreign[2]
                         status, scope = "unknown", "unknown"
                 if reading:
-                    if reading.startswith(("-", "—", "－")):
+                    if reading.startswith(("-", "—", "－", "−")):
                         reading = reading[1:]
                         scope = "partial"
                     if original:
@@ -99,7 +114,7 @@ def lexical_notations(text: str, *, series: str = "liangshuang") -> list[Lexical
                     if scope == "partial" and re.fullmatch(r"[ぁ-ゖァ-ヺー]+", reading):
                         prefix = (
                             surface
-                            if original or raw_word[reading_match.start() + 1] in "-—－"
+                            if original or raw_word[reading_match.start() + 1] in "-—－−"
                             else raw_word[: reading_match.start()]
                         )
                         base = re.search(r"[\u3400-\u9fff々]+$", prefix)
