@@ -8,7 +8,10 @@ HEADINGS = {
     "学习目标": "lesson_goal",
     "如何用日语表达？": "lesson_goal",
     "会话": "dialogue",
+    # Preserve a reading passage boundary without classifying it as a dialogue.
+    "课文": "unknown",
     "会话用单词": "vocabulary",
+    "课文单词": "vocabulary",
     "语法解释用单词": "vocabulary",
     "习题用单词": "vocabulary",
     "语法解释": "grammar",

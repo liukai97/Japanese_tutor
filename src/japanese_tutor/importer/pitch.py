@@ -32,6 +32,17 @@ def parse_pitch(raw: str, *, series: str = "liangshuang", is_phrase: bool = Fals
 
 
 def lexical_notations(text: str, *, series: str = "liangshuang") -> list[LexicalNotation]:
+    # A Latin abbreviation's kana expansion is neither its reading nor another
+    # word named "の略". Keep both printed forms and the foreign original.
+    abbreviation = re.fullmatch(
+        r"\s*([A-Za-z][A-Za-z0-9]*)\s*[（(]([ァ-ヺー・\s]+)の略[）)]"
+        r"\s*[（(]([A-Za-z][A-Za-z .'-]*)[）)]\s*", text
+    )
+    if series == "liangshuang" and abbreviation:
+        return [
+            LexicalNotation(surface=surface, loanword_original=abbreviation[3].strip())
+            for surface in [abbreviation[1], re.sub(r"\s+", "", abbreviation[2])]
+        ]
     result = []
     # A cell may have indented component words and a wrapped accent marker.
     lines = text.splitlines()
@@ -78,8 +89,15 @@ def lexical_notations(text: str, *, series: str = "liangshuang") -> list[Lexical
         if reading:
             # This series also prints kana words with a bracketed kanji spelling
             # in the reading slot, e.g. すぐ（【直】ぐ） and ところ（【所】）.
-            alternate = re.fullmatch(r"【([\u3400-\u9fff々]+)】([ぁ-ゖァ-ヺー]*)", reading)
-            if series == "liangshuang" and alternate and re.fullmatch(r"[ぁ-ゖァ-ヺー]+", surface):
+            alternate = re.fullmatch(
+                r"【([\u3400-\u9fff々ぁ-ゖァ-ヺー]+)】([ぁ-ゖァ-ヺー]*)", reading
+            )
+            if (
+                series == "liangshuang"
+                and alternate
+                and re.search(r"[\u3400-\u9fff々]", alternate[1])
+                and re.fullmatch(r"[ぁ-ゖァ-ヺー]+", surface)
+            ):
                 variants.append(alternate[1] + alternate[2])
                 reading = None
         if reading:
