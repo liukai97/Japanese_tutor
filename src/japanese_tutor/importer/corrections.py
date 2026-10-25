@@ -29,7 +29,10 @@ class TextCorrection(Contract):
 
 class ReviewResolution(Contract):
     page: int = Field(ge=1)
-    category: Literal["font_mapping", "unbound_ruby", "unsupported_layout", "unrecovered_tables"]
+    category: Literal[
+        "font_mapping", "unbound_ruby", "low_confidence_ruby",
+        "unsupported_layout", "unrecovered_tables",
+    ]
     expected_table_text: str | None = None
     intentional_empty_cells: list[tuple[int, int]] = Field(default_factory=list)
 
