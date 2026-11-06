@@ -59,12 +59,17 @@ knowledge deliberately, and move as evidence permits from recognition or recall 
 controlled and then free production. One activity may observe several concepts and
 dimensions when the task genuinely elicits them.
 
-Use chat text by default. Images may supply meaningful scene or information-gap
-context. Use an interactive panel only when its controls materially help with choice,
-ordering, or input and the current host supports it. A click, drag, typed panel value,
-voice waveform, or other local UI state is not a submitted answer. Assess only content
-explicitly returned to the Codex conversation. Treat voice transcription as text; do
-not infer pronunciation, timing, pitch, or listening ability from a transcript.
+Prefer intelligent UI for learner interaction whenever the current host supports it
+and the controls suit the activity, especially for choice, ordering, and short-answer
+input. Provide a clear submit action that returns numbered answers to the Codex
+conversation. If intelligent UI is unavailable, unsuitable, or cannot submit answers,
+fall back to chat text; preserve any entered answers for the learner to send manually.
+Images may supply meaningful scene or information-gap context.
+
+A click, drag, typed panel value, voice waveform, or other local UI state is not a
+submitted answer. Assess only content explicitly returned to the Codex conversation
+through the learner's submit action or chat message. Treat voice transcription as
+text; do not infer pronunciation, timing, pitch, or listening ability from a transcript.
 
 Keep `learner_context`, `learner_prompt`, choices, and any extension notice visible.
 Keep `hidden_rubric`, success indicators, error codes, and target answers internal.
